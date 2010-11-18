@@ -121,6 +121,7 @@ static int xiprd_init(void)
     dev->ramdisk = vmalloc(dev->size);
     if(!dev->ramdisk)
     {
+        printk(KERN_ERR "%s failed allocating RAM backing\n", dev->name);
         rc = -ENOMEM;
         goto err_out;
     }
@@ -128,11 +129,16 @@ static int xiprd_init(void)
     /* register the block device, allocate and init a disk */
     rc = register_blkdev(0, dev->name);
     if(rc < 0)
+    {
+        printk(KERN_ERR "%s failed registering block device\n", dev->name);
         goto err_out;
+    }
+    dev->major = rc;
 
     dev->disk = alloc_disk(NUM_MINORS);
     if(!dev->disk)
     {
+        printk(KERN_ERR "%s failed alloc_disk\n", dev->name);
         rc = -ENOMEM;
         goto err_out;
     }
@@ -148,6 +154,7 @@ static int xiprd_init(void)
     dev->disk->queue = blk_alloc_queue(GFP_KERNEL);
     if(!dev->disk->queue)
     {
+        printk(KERN_ERR "%s failed blk_alloc_queue\n", dev->name);
         rc = -ENOMEM;
         goto err_out;
     }
@@ -158,6 +165,9 @@ static int xiprd_init(void)
 
     kernel_sectors = ((u64)num_sectors*sector_size) >> KERNEL_SHIFT;
     set_capacity(dev->disk, kernel_sectors);
+
+    printk(KERN_INFO "%s disk size %llu B, %lu %d-B sectors\n",
+           dev->name, dev->size, num_sectors, sector_size);
 
     spin_lock_init(&dev->lock);
 
@@ -174,8 +184,9 @@ err_out:
         del_gendisk(dev->disk);
         put_disk(dev->disk);
         blk_cleanup_queue(dev->disk->queue);
-        unregister_blkdev(dev->major, dev->name);
     }
+    if(dev->major)
+       unregister_blkdev(dev->major, dev->name);
 
     return rc;
 }
@@ -184,6 +195,7 @@ static void xiprd_exit(void)
 {
     struct xiprd_dev * dev = &globaldev;
     
+    printk(KERN_INFO "%s shutting down\n", dev->name);
     if(dev->ramdisk)
         vfree(dev->ramdisk);
     if(dev->disk)
@@ -191,8 +203,10 @@ static void xiprd_exit(void)
         del_gendisk(dev->disk);
         put_disk(dev->disk);
         blk_cleanup_queue(dev->disk->queue);
-        unregister_blkdev(dev->major, dev->name);
     }
+
+    if(dev->major)
+       unregister_blkdev(dev->major, dev->name);
 }
 
 
