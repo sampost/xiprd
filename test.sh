@@ -5,6 +5,7 @@
 
 dev=xiprd0
 ko=xiprd
+mount=/mnt/xip
 
 # bash function to write & read-verify a sector using dd.
 # definitely not the most efficient method, just meant
@@ -23,7 +24,7 @@ function read_write_sector()
       echo "Mismatch on $sector"
    fi
 }
-  
+
 
 ##################################
 # MAIN LOGIC
@@ -54,6 +55,9 @@ if [ "$1" == "fio" ]; then
    sudo fio --bs=4k --ioengine=libaio --iodepth=4 --numjobs=5 --size=1g   \
 	   --direct=1 --runtime=10 --filename=/dev/$dev --name=seq-read \
 	   --rw=rwmix --time_based --group_reporting
+elif [ "$1" == "mount" ]; then
+   sudo mkfs.ext4 /dev/$dev
+   sudo mount -t ext4 /dev/$dev $mount && sudo cp foo.bin $mount/ && diff $foo.bin $mount/foo.bin
 else
    # exercise every sector in a range
    for sector in `seq $startsect $endsect`; do

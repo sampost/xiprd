@@ -26,7 +26,7 @@ MODULE_DESCRIPTION("Simple XIP-capable ram-backed block driver");
 #define KERNEL_SHIFT   9
 
 #define debug_print(...)
-//printk(__va_args__)
+//printk(__VA_ARGS__)
 
 /*
  * Module parameters: sector size, total bytes
