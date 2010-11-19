@@ -25,6 +25,9 @@ MODULE_DESCRIPTION("Simple XIP-capable ram-backed block driver");
 #define SECTOR_SIZE    (1 << SECTOR_SHIFT)
 #define KERNEL_SHIFT   9
 
+#define debug_print(...)
+//printk(__va_args__)
+
 /*
  * Module parameters: sector size, total bytes
  */
@@ -74,6 +77,10 @@ static int xiprd_make_request(struct request_queue * q, struct bio * bi)
 
     dev = q->queuedata;
 
+    debug_print("%s(sector=%10llu, size=%10d, dir=%c\n",
+                __FUNCTION__, (u64)bi->bi_sector,
+                bi->bi_size, bio_data_dir(bi) == WRITE ? 'w' : 'r');
+
     /* convert from kernel sector to byte offset */
     offset = bi->bi_sector << KERNEL_SHIFT;
 
@@ -81,6 +88,8 @@ static int xiprd_make_request(struct request_queue * q, struct bio * bi)
     bio_for_each_segment(bvec, bi, segno)
     {
         dest = dev->ramdisk + offset;
+        debug_print("--- ofs=%-10llu, bv_len=%d, rd=0x%p, dest=0x%p\n",
+                    offset, bvec->bv_len, dev->ramdisk, dest);
 
         buf = kmap_atomic(bvec->bv_page, KM_USER0);
         if(bio_data_dir(bi) == WRITE)
