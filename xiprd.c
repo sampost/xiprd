@@ -59,11 +59,14 @@ static sector_t kernel_sectors;
  */
 static int xiprd_getgeo(struct block_device *bdev, struct hd_geometry *geo);
 static int xiprd_make_request(struct request_queue * q, struct bio * bi);
+static int xiprd_direct_access(struct block_device * bdev, sector_t ksector,
+                               void ** kaddr, unsigned long * pfn);
 
 struct block_device_operations xiprd_bd_ops =
 {
     .owner    = THIS_MODULE,
     .getgeo   = xiprd_getgeo,
+    .direct_access = xiprd_direct_access,
 };
 
 
@@ -104,6 +107,32 @@ static int xiprd_make_request(struct request_queue * q, struct bio * bi)
 
     bio_endio(bi, 0);
     return 0; /* non-zero causes re-submission to another (layered) device */
+}
+
+static int xiprd_direct_access(struct block_device * bdev, sector_t ksector,
+                               void ** kaddr, unsigned long * pfn)
+{
+   struct xiprd_dev * dev;
+   unsigned long page_offset;
+
+   debug_print("%s(sector=%llu)\n", __FUNCTION__, (u64)ksector);
+
+   dev = bdev->bd_disk->private_data;
+   if(!dev)
+      return -ENODEV;
+
+   /* ignore beyond-end or page-aligned requests */
+   if((ksector<<KERNEL_SHIFT) > dev->size ||
+       ksector % (PAGE_SIZE/(1<<KERNEL_SHIFT)))
+      return -EINVAL;
+
+   page_offset = ksector / (PAGE_SIZE >> KERNEL_SHIFT);
+
+   /* convert from vmalloc'd destination to PFN */
+   *kaddr = (void*)(dev->ramdisk + (page_offset * PAGE_SIZE));
+   *pfn = virt_to_phys(*kaddr) >> PAGE_SHIFT;
+
+   return 0;
 }
 
 static int xiprd_getgeo(struct block_device *bdev, struct hd_geometry *geo)
