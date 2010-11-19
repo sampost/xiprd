@@ -58,6 +58,7 @@ if [ "$1" == "fio" ]; then
 elif [ "$1" == "mount" ]; then
    sudo mkfs.ext4 /dev/$dev
    sudo mount -t ext4 /dev/$dev $mount && sudo cp foo.bin $mount/ && diff $foo.bin $mount/foo.bin
+   sudo umount $mount
 else
    # exercise every sector in a range
    for sector in `seq $startsect $endsect`; do
