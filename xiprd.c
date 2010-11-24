@@ -32,7 +32,7 @@ MODULE_DESCRIPTION("Simple XIP-capable ram-backed block driver");
  * Module parameters: sector size, total bytes
  */
 static int sector_size    = SECTOR_SIZE;
-static u_long num_sectors = (1024 * 1024 * 1024ULL >> SECTOR_SHIFT);
+static u_long num_sectors = (2 * 1024 * 1024 * 1024ULL >> SECTOR_SHIFT);
 module_param(sector_size, int, 0444);
 module_param(num_sectors, ulong, 0444);
 MODULE_PARM_DESC(num_sectors, "Number of sectors. Defaults to 1GiB/sector_size.");
@@ -122,15 +122,25 @@ static int xiprd_direct_access(struct block_device * bdev, sector_t ksector,
       return -ENODEV;
 
    /* ignore beyond-end or page-aligned requests */
-   if((ksector<<KERNEL_SHIFT) > dev->size ||
+   if(((u64)ksector<<KERNEL_SHIFT) > dev->size ||
        ksector % (PAGE_SIZE/(1<<KERNEL_SHIFT)))
+   {
+      printk("returning -EINVAL\n");
       return -EINVAL;
+   }
 
    page_offset = ksector / (PAGE_SIZE >> KERNEL_SHIFT);
+   debug_print("page_offset=%lu\n", page_offset);
+   if((page_offset+1)*PAGE_SIZE-1 > dev->size)
+   {
+      debug_print("returning -EINVAL\n");
+      return -ERANGE;
+   }
 
    /* convert from vmalloc'd destination to PFN */
    *kaddr = (void*)(dev->ramdisk + (page_offset * PAGE_SIZE));
    *pfn = virt_to_phys(*kaddr) >> PAGE_SHIFT;
+   debug_print("ramdisk=%p, kaddr=%p, pfn=%lu\n", dev->ramdisk, *kaddr, *pfn);
 
    return 0;
 }
